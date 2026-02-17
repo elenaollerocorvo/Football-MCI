@@ -1,166 +1,165 @@
 # Listing B.1 : Feature extraction
-# Script que extrae características de videos de fútbol usando YOLO
-# Detecta personas, sus keypoints corporales y el balón para crear una matriz de datos
+# Script that extracts features from football (soccer) videos using YOLO
+# Detects people, their body keypoints, and the ball to create a data matrix
 
-# Importación de bibliotecas necesarias
-from ultralytics import YOLO  # Framework YOLO para detección de objetos y pose
-import cv2  # OpenCV para procesamiento de video
-from math import *  # Funciones matemáticas
+# Import necessary libraries
+from ultralytics import YOLO  # YOLO framework for object and pose detection
+import cv2  # OpenCV for video processing
+from math import * # Mathematical functions
 import os
-import json  # Para leer archivos de etiquetas
+import json  # To read label files
 import numpy as np
 import tempfile
-from collections import defaultdict  # Diccionarios con valores por defecto
-import re  # Expresiones regulares
-import pandas as pd  # Para crear DataFrames y exportar CSV
+from collections import defaultdict  # Dictionaries with default values
+import re  # Regular expressions
+import pandas as pd  # To create DataFrames and export to CSV
 
-# Cargar modelos YOLO pre-entrenados
-pose = YOLO('yolov8m-pose.pt')  # Modelo para detección de pose humana (keypoints)
-obj_det = YOLO('yolov8x.pt')  # Modelo para detección de objetos (persona y balón)
+# Load pre-trained YOLO models
+pose = YOLO('yolov8m-pose.pt')  # Model for human pose detection (keypoints)
+obj_det = YOLO('yolov8x.pt')  # Model for object detection (person and ball)
 
-# Rutas a las carpetas de entrada
+# Paths to input folders
 video_folder_path = "C:\\Users\\Domagoj\\Desktop\\Diplomski\\Videos\\Session 25"
 json_folder_path  = "C:\\Users\\Domagoj\\Desktop\\Diplomski\\Json\\Session 25 json"
-video_folder = os.listdir(video_folder_path)  # Lista de archivos de video
+video_folder = os.listdir(video_folder_path)  # List of video files
 
-# Matriz principal para almacenar todas las características extraídas
+# Main matrix to store all extracted features
 panda_matrix = []
 
-# Codificación one-hot para las clases de toque
-one_hot_enc_class = {"RightF":[1,0,0,0,0,0],  # Pie derecho
-                     "LeftF":[0,1,0,0,0,0],   # Pie izquierdo
-                     "RightT":[0,0,1,0,0,0],  # Muslo derecho
-                     "LeftT":[0,0,0,1,0,0],   # Muslo izquierdo
-                     "Chest":[0,0,0,0,1,0],   # Pecho
-                     "Other":[0,0,0,0,0,1]}   # Otro (sin toque)
+# One-hot encoding for touch classes
+one_hot_enc_class = {"RightF":[1,0,0,0,0,0],  # Right foot
+                     "LeftF":[0,1,0,0,0,0],   # Left foot
+                     "RightT":[0,0,1,0,0,0],  # Right thigh
+                     "LeftT":[0,0,0,1,0,0],   # Left thigh
+                     "Chest":[0,0,0,0,1,0],   # Chest
+                     "Other":[0,0,0,0,0,1]}   # Other (no touch)
 
-# Contadores para videos con problemas
-no_touch_counter = 0  # Videos sin toques etiquetados
-ball_missing = 0  # Videos donde se pierde el balón
-people_overload = 0  # Videos con más de una persona
-bad_video_list = []  # Lista de IDs de videos con datos problemáticos
+# Counters for problematic videos
+no_touch_counter = 0  # Videos with no labeled touches
+ball_missing = 0  # Videos where the ball is lost
+people_overload = 0  # Videos with more than one person
+bad_video_list = []  # List of video IDs with problematic data
 
-
-# Contador de videos procesados
+# Processed video counter
 video_counter = 1
 
-# Bucle principal: procesar cada video en la carpeta
+# Main loop: process each video in the folder
 for video_path in video_folder:
     
-    # Filtrar solo archivos .avi
+    # Filter only .avi files
     if not video_path.endswith('.avi'):
         continue
     print(video_path)
     
-    # Cargar archivo JSON con las etiquetas del video
+    # Load JSON file with video labels
     json_name = '.'.join([video_path.split('.')[0],'json'])
     json_file_path = os.path.join(json_folder_path, json_name)
     json_file = open(json_file_path, 'r')
     json_data = json.load(json_file)
-    button_presses = json_data['button_presses']  # String con formato "Clase:Frame;Clase:Frame;..."
+    button_presses = json_data['button_presses']  # String formatted as "Class:Frame;Class:Frame;..."
     
-    # Saltar videos sin toques etiquetados
+    # Skip videos with no labeled touches
     if button_presses == "" or button_presses == " ":
         no_touch_counter += 1
         continue
     
-    # Extraer información del primer y último toque
+    # Extract information about the first and last touch
     first_touch_string = button_presses.split(";")[0]
-    frame_of_first_touch = int(first_touch_string.split(":")[1])  # Frame del primer toque
-    class_of_first_touch = first_touch_string.split(":")[0]  # Clase del primer toque
+    frame_of_first_touch = int(first_touch_string.split(":")[1])  # Frame of the first touch
+    class_of_first_touch = first_touch_string.split(":")[0]  # Class of the first touch
     last_touch_string = button_presses.split(";")[-1]
-    frame_of_last_touch = int(last_touch_string.split(":")[1])  # Frame del último toque
+    frame_of_last_touch = int(last_touch_string.split(":")[1])  # Frame of the last touch
     
-    # Crear diccionario {frame: clase} con todos los toques
+    # Create dictionary {frame: class} with all touches
     list_of_clss_frame = re.split(':|;', button_presses)
     dict_class_frame = dict()
     for i in range(1, len(list_of_clss_frame), 2):
-                dict_class_frame[int(list_of_clss_frame[i])] = list_of_clss_frame[i-1]
+        dict_class_frame[int(list_of_clss_frame[i])] = list_of_clss_frame[i-1]
 
 
-    # Abrir el video para procesamiento frame por frame
+    # Open the video for frame-by-frame processing
     cap = cv2.VideoCapture(os.path.join(video_folder_path,video_path))
 
-    # Variables para tracking de objetos a lo largo del video
-    track_history_ball = defaultdict(lambda: [])  # Historial de posiciones del balón por ID
-    track_history_person = []  # Historial de detecciones de persona
-    active_ball = None  # ID del balón activo (el que interactúa con la persona)
-    bad_video = False  # Flag para marcar videos con problemas
-    active_ball_dict = dict()  # Diccionario {ball_id: frame_inicio}
-    ball_lost_counter = 0  # Contador de frames sin detectar el balón activo
+    # Variables for object tracking throughout the video
+    track_history_ball = defaultdict(lambda: [])  # History of ball positions by ID
+    track_history_person = []  # History of person detections
+    active_ball = None  # ID of the active ball (the one interacting with the person)
+    bad_video = False  # Flag to mark problematic videos
+    active_ball_dict = dict()  # Dictionary {ball_id: start_frame}
+    ball_lost_counter = 0  # Counter for frames without detecting the active ball
     
-    # Bucle de procesamiento frame por frame
+    # Frame-by-frame processing loop
     while cap.isOpened():
-        # Leer siguiente frame del video
+        # Read next frame of the video
         success, frame = cap.read()
-        frame_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  # Total de frames
+        frame_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  # Total frames
         first_active_ball_found = False
 
         if success:
-            # Ejecutar detección y tracking de objetos (persona clase=0, balón clase=32)
-            results = obj_det.track(frame, persist=True, classes = [0,32], verbose = False, conf = 0.4)
-            clss = results[0].boxes.cls.cpu().tolist()  # Lista de clases detectadas
+            # Run object detection and tracking (person class=0, ball class=32)
+            results = obj_det.track(frame, persist=True, classes=[0,32], verbose=False, conf=0.4)
+            clss = results[0].boxes.cls.cpu().tolist()  # List of detected classes
             
-            # Ejecutar detección de pose humana (17 keypoints corporales)
+            # Run human pose detection (17 body keypoints)
             human_pose = pose.predict(frame, verbose=False)
-            current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))  # Número del frame actual
+            current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))  # Current frame number
 
-            # Extraer coordenadas de keypoints corporales
+            # Extract body keypoint coordinates
             keypoints = human_pose[0].keypoints.xy.cpu().numpy().tolist()
 
-            # Inicializar posiciones de partes del cuerpo con valor por defecto (2000,2000)
-            # Este valor indica que no se detectó esa parte del cuerpo
-            right_foot = (2000,2000)  # Pie derecho
-            left_foot = (2000,2000)   # Pie izquierdo
-            right_thigh = (2000,2000) # Muslo derecho
-            left_thigh = (2000,2000)  # Muslo izquierdo
-            chest  = (2000,2000)      # Pecho
+            # Initialize body part positions with default value (2000,2000)
+            # This value indicates that the body part was not detected
+            right_foot = (2000,2000)  # Right foot
+            left_foot = (2000,2000)   # Left foot
+            right_thigh = (2000,2000) # Right thigh
+            left_thigh = (2000,2000)  # Left thigh
+            chest  = (2000,2000)      # Chest
             
-            # Si se detectaron todos los keypoints necesarios
+            # If all necessary keypoints were detected
             if len(keypoints[0]) == 17 and [0.0,0.0] not in keypoints[0][11:17] and [0.0,0.0] not in keypoints[0][5:7]:
-                right_foot = keypoints[0][16]  # Keypoint 16: tobillo derecho
-                left_foot = keypoints[0][15]   # Keypoint 15: tobillo izquierdo
-                # Muslo derecho: promedio entre rodilla (14) y cadera (12)
+                right_foot = keypoints[0][16]  # Keypoint 16: right ankle
+                left_foot = keypoints[0][15]   # Keypoint 15: left ankle
+                # Right thigh: average between knee (14) and hip (12)
                 right_thigh = [(keypoints[0][14][0] + keypoints[0][12][0])/2, (keypoints[0][14][1] + keypoints[0][12][1])/2]
-                # Muslo izquierdo: promedio entre rodilla (13) y cadera (11)
+                # Left thigh: average between knee (13) and hip (11)
                 left_thigh = [(keypoints[0][13][0] + keypoints[0][11][0])/2, (keypoints[0][13][1] + keypoints[0][11][1])/2]
-                # Pecho: promedio entre hombros (6 y 5)
+                # Chest: average between shoulders (6 and 5)
                 chest = [(keypoints[0][6][0] + keypoints[0][5][0])/2, (keypoints[0][6][1] + keypoints[0][5][1])/2]
             
-            person_found = False  # Flag para indicar si ya se encontró una persona
-            indx = 0  # Índice para iterar sobre las detecciones
+            person_found = False  # Flag indicating if a person has already been found
+            indx = 0  # Index to iterate over detections
             # if active_ball != None and current_frame <= frame_of_last_touch and active_ball not in results[0].boxes.id.int().cpu().tolist():
             #     bad_video = True
             #     ball_missing += 1
             #     cap.release()
             #     break
-            active_ball_found = False  # Flag para saber si se detectó el balón activo en este frame
+            active_ball_found = False  # Flag to know if the active ball was detected in this frame
             
-            # Procesar cada objeto detectado en el frame
+            # Process each detected object in the frame
             for obj in clss:
                 try:
-                    # Si es una persona (clase 0) y aún no se ha encontrado ninguna
+                    # If it's a person (class 0) and none has been found yet
                     if obj == 0 and not person_found:
                         keypoints = human_pose[0].keypoints.xy.cpu().numpy().tolist()
-                        person_height = results[0].boxes.xywh.cpu().tolist()[indx][3]  # Altura del bounding box
-                        # Guardar keypoints, altura y frame en el historial
+                        person_height = results[0].boxes.xywh.cpu().tolist()[indx][3]  # Bounding box height
+                        # Save keypoints, height, and frame to history
                         track_history_person.append((keypoints[0], person_height, current_frame))
                         person_found = True
                         
-                    # Si es un balón (clase 32)
+                    # If it's a ball (class 32)
                     elif obj == 32:
-                        boxes = results[0].boxes.xywh.cpu()[indx]  # Coordenadas del bounding box
-                        track_ids = results[0].boxes.id.int().cpu().tolist()[indx]  # ID único del tracking
+                        boxes = results[0].boxes.xywh.cpu()[indx]  # Bounding box coordinates
+                        track_ids = results[0].boxes.id.int().cpu().tolist()[indx]  # Unique tracking ID
                         
-                        # Verificar si es el balón activo
+                        # Check if it's the active ball
                         if track_ids == active_ball:
                             active_ball_found = True
                             
-                        x, y, w, h = boxes  # Centro (x,y), ancho y alto del bounding box
+                        x, y, w, h = boxes  # Center (x,y), width, and height of bounding box
                         track = track_history_ball[track_ids]
-                        track.append((float(x), float(y), float(h), current_frame))  # Guardar posición y frame
+                        track.append((float(x), float(y), float(h), current_frame))  # Save position and frame
                         
-                    # Si se detecta una segunda persona en el primer frame, marcar video como malo
+                    # If a second person is detected in the first frame, mark video as bad
                     elif obj == 0 and person_found and current_frame == 1:
                         bad_video = True
                         people_overload += 1
@@ -168,10 +167,10 @@ for video_path in video_folder:
                         break
                 except:
                     pass
-                indx+=1  # Incrementar índice para siguiente detección
+                indx+=1  # Increment index for next detection
                 
             if not active_ball_found and first_active_ball_found:
-                last_ball_id =  track_history_ball.keys()[-1]
+                last_ball_id = list(track_history_ball.keys())[-1]
                 ball_lost_counter += 1
                 if last_ball_id != active_ball and track_history_ball[last_ball_id][0][-1] > track_history_ball[active_ball][-1][-1]:
                     new_ball_added_x = track_history_ball[last_ball_id][-1][0]
@@ -185,16 +184,17 @@ for video_path in video_folder:
                         active_ball_dict[active_ball] = current_frame
                         ball_lost_counter = 0
                 
-                if ball_lost_counter == 10:
-                    ball_missing += 1
-                    bad_video = True
-                    cap.release()
-                    break
-            # En el frame del primer toque, identificar cuál balón es el activo
-            if current_frame == frame_of_first_touch:
-                min_distance = 820  # Distancia mínima inicial (valor grande)
+            if ball_lost_counter == 10:
+                ball_missing += 1
+                bad_video = True
+                cap.release()
+                break
                 
-                # Determinar qué parte del cuerpo tocó el balón
+            # In the frame of the first touch, identify which ball is active
+            if current_frame == frame_of_first_touch:
+                min_distance = 820  # Initial minimum distance (large value)
+                
+                # Determine which body part touched the ball
                 if 'RightF' in class_of_first_touch:
                     first_touch = right_foot
                 elif 'LeftF' in class_of_first_touch:
@@ -206,122 +206,123 @@ for video_path in video_folder:
                 elif 'Chest' in class_of_first_touch:
                     first_touch = chest
                 
-                # Si solo hay un balón detectado, ese es el activo
+                # If only one ball is detected, that's the active one
                 if len(list(track_history_ball.keys())) == 1:
                     active_ball = list(track_history_ball.keys())[0]
                 else:
-                    # Si hay múltiples balones, encontrar el más cercano al punto de toque
+                    # If there are multiple balls, find the closest one to the touch point
                     for key in track_history_ball.keys():
-                        # Ignorar balones que no se han visto recientemente
+                        # Ignore balls that haven't been seen recently
                         if track_history_ball[key][-1][-1] < current_frame-3:
                             continue
-                        # Calcular distancia euclidiana entre balón y punto de toque
+                        # Calculate Euclidean distance between ball and touch point
                         x_diff = track_history_ball[key][-1][0] - first_touch[0]
                         y_diff = track_history_ball[key][-1][1] - first_touch[1]
                         distance = sqrt(x_diff**2 + y_diff**2)
-                        # El balón más cercano es el activo
+                        # The closest ball is the active one
                         if distance < min_distance:
                             active_ball = key
                             min_distance = distance
                             first_active_ball_found = True
                 
-                # Si no se pudo identificar el balón activo, marcar video como malo
+                # If the active ball couldn't be identified, mark video as bad
                 if active_ball == None:
                     ball_missing += 1
                     bad_video = True
                     cap.release()
                     break
                 else:
-                    active_ball_dict[active_ball] = current_frame  # Registrar inicio del balón activo
+                    active_ball_dict[active_ball] = current_frame  # Register start of the active ball
         else:
             # Break the loop if the end of the video is reached
             break
         
     cap.release()
     
-    # Si el video tuvo problemas, saltarlo y continuar con el siguiente
+    # If the video had issues, skip it and continue to the next one
     if bad_video:
         continue
 
-    # Variables para construir la matriz de características frame por frame
-    person_counter = 0  # Índice actual en track_history_person
-    ball_counter = 0    # Índice actual en track_history_ball para el balón activo
+    # Variables to build the feature matrix frame by frame
+    person_counter = 0  # Current index in track_history_person
+    ball_counter = 0    # Current index in track_history_ball for the active ball
     last_ball_frame = 0
-    bad_data_touch_counter = 0  # Contador de frames con toque pero sin datos
-    keys = list(active_ball_dict.keys())  # Lista de IDs de balones activos
-    active_ball_position = 0  # Índice del balón activo actual
-    active_ball = keys[active_ball_position]  # ID del balón activo actual
+    bad_data_touch_counter = 0  # Counter for frames with touch but no data
+    keys = list(active_ball_dict.keys())  # List of active ball IDs
+    active_ball_position = 0  # Index of current active ball
+    active_ball = keys[active_ball_position]  # ID of current active ball
     
-    # Construir matriz de características para cada frame del video
+    # Build feature matrix for each frame of the video
     for frame_counter in range(1, frame_total+1):
         if active_ball != keys[-1] and frame_counter == active_ball_dict[keys[active_ball_position+1]]:
             active_ball_position += 1
             active_ball = keys[active_ball_position]
             ball_counter = 0
-        # Obtener datos del balón y persona para el frame actual
+            
+        # Get ball and person data for the current frame
         ball_data = track_history_ball[active_ball][ball_counter]
         person_data = track_history_person[person_counter]
-        latest_active_ball_frame = ball_data[-1]  # Frame del último dato del balón
-        latest_active_person_frame = person_data[-1]  # Frame del último dato de la persona
+        latest_active_ball_frame = ball_data[-1]  # Frame of the last ball data
+        latest_active_person_frame = person_data[-1]  # Frame of the last person data
         
-        # Inicializar variables de características con valores por defecto
+        # Initialize feature variables with default values
         x_center_ball = None
         y_center_ball = None
         ball_height = None
         person_height = None
-        dist_ball_rfoot = 820   # Distancia balón-pie derecho (820 = no disponible)
-        dist_ball_lfoot = 820   # Distancia balón-pie izquierdo
-        dist_ball_rthigh = 820  # Distancia balón-muslo derecho
-        dist_ball_lthigh = 820  # Distancia balón-muslo izquierdo
-        dist_ball_chest = 820   # Distancia balón-pecho
-        height_ratio = 0        # Ratio altura persona/altura balón
+        dist_ball_rfoot = 820   # Ball-right foot distance (820 = unavailable)
+        dist_ball_lfoot = 820   # Ball-left foot distance
+        dist_ball_rthigh = 820  # Ball-right thigh distance
+        dist_ball_lthigh = 820  # Ball-left thigh distance
+        dist_ball_chest = 820   # Ball-chest distance
+        height_ratio = 0        # Person height / ball height ratio
         
-        # Si tenemos datos válidos tanto del balón como de la persona en este frame
+        # If we have valid data for both the ball and person in this frame
         if latest_active_ball_frame == frame_counter and latest_active_person_frame == frame_counter and len(person_data[0]) == 17 and [0.0,0.0] not in person_data[0][11:17] and [0.0,0.0] not in person_data[0][5:7]:
-            # Extraer coordenadas del balón
+            # Extract ball coordinates
             x_center_ball = ball_data[0]
             y_center_ball = ball_data[1]
             ball_height = ball_data[2]
             
-            # Extraer keypoints relevantes de la persona
+            # Extract relevant person keypoints
             right_foot_kp = person_data[0][16]
             left_foot_kp = person_data[0][15]
             right_thigh_kp = [(person_data[0][14][0] + person_data[0][12][0])/2, (person_data[0][14][1] + person_data[0][12][1])/2]
             left_thigh_kp = [(person_data[0][13][0] + person_data[0][11][0])/2, (person_data[0][13][1] + person_data[0][11][1])/2]
             chest_kp = [(person_data[0][6][0] + person_data[0][5][0])/2, (person_data[0][6][1] + person_data[0][5][1])/2]
 
-            # Calcular distancias euclidianas entre el balón y cada parte del cuerpo
+            # Calculate Euclidean distances between ball and each body part
             dist_ball_rfoot = int(sqrt((x_center_ball-right_foot_kp[0])**2 + (y_center_ball-right_foot_kp[1])**2))
             dist_ball_lfoot = int(sqrt((x_center_ball-left_foot_kp[0])**2 + (y_center_ball-left_foot_kp[1])**2))
             dist_ball_rthigh = int(sqrt((x_center_ball-right_thigh_kp[0])**2 + (y_center_ball-right_thigh_kp[1])**2))
             dist_ball_lthigh = int(sqrt((x_center_ball-left_thigh_kp[0])**2 + (y_center_ball-left_thigh_kp[1])**2))
             dist_ball_chest = int(sqrt((x_center_ball-chest_kp[0])**2 + (y_center_ball-chest_kp[1])**2))
             
-            # Calcular ratio de alturas (normalización)
+            # Calculate height ratio (normalization)
             height_ratio = person_data[1]/ball_height
 
-        # Verificar si hay un toque en un rango de ±3 frames del frame actual
+        # Check if there is a touch within a range of ±3 frames of the current frame
         recognition_of_touch = False
         for i in range(-3,4):
             recognition_of_touch = recognition_of_touch or (frame_counter+i in dict_class_frame.keys())
             if recognition_of_touch:
                 break
         
-        # Si hay toque pero no hay datos válidos, incrementar contador de mal dato
+        # If there is a touch but no valid data, increment bad data counter
         if recognition_of_touch and dist_ball_rfoot == 820:
             bad_data_touch_counter += 1
-            # Si hay 7 frames consecutivos con este problema, marcar video como malo
+            # If there are 7 consecutive frames with this problem, mark video as bad
             if bad_data_touch_counter == 7:
                 bad_video_list.append(video_counter)
         else:
             bad_data_touch_counter = 0
         
-        # Añadir fila a la matriz principal con las características y la etiqueta
+        # Add row to the main matrix with features and label
         if recognition_of_touch:
-            # Si hay toque, usar la clase etiquetada
+            # If there's a touch, use the labeled class
             panda_matrix.append([video_counter, frame_counter, dist_ball_rfoot, dist_ball_lfoot, dist_ball_rthigh, dist_ball_lthigh, dist_ball_chest, height_ratio] + one_hot_enc_class[(dict_class_frame[frame_counter + i]).strip(" ")])
         else:
-            # Si no hay toque, etiquetar como "Other"
+            # If there's no touch, label as "Other"
             panda_matrix.append([video_counter, frame_counter, dist_ball_rfoot, dist_ball_lfoot, dist_ball_rthigh, dist_ball_lthigh, dist_ball_chest, height_ratio] + one_hot_enc_class["Other"])
 
 
@@ -332,20 +333,20 @@ for video_path in video_folder:
 
         
     print("video number: ", video_counter, " has finished succesfully")
-    video_counter += 1  # Incrementar contador de videos
+    video_counter += 1  # Increment video counter
 
     
-# Crear DataFrame de pandas con todas las características extraídas
-# Columnas: ID de video, número de frame, distancias a cada parte del cuerpo,
-# ratio de alturas, y codificación one-hot de la clase
+# Create pandas DataFrame with all extracted features
+# Columns: video ID, frame number, distances to each body part,
+# height ratio, and one-hot encoding of the class
 column_names = ["video_id", "frame_no", "distance_to_RF","distance_to_LF","distance_to_RT", "distance_to_LT","distance_to_CH", "person_ball_H_rt", "RightF", "LeftF", "RightT", "LeftT", "Chest", "Other"]
 data_frame = pd.DataFrame(panda_matrix, columns=column_names)
 
-# Filtrar videos con datos problemáticos
+# Filter videos with problematic data
 df_filtered = data_frame[~data_frame['video_id'].isin(bad_video_list)]
 
-# Exportar DataFrame a archivo CSV
+# Export DataFrame to CSV file
 df_filtered.to_csv("C:\\Users\\Domagoj\\Desktop\\Diplomski\\Codes\\New_data_Session25_chest_filtered.csv", index=False)
 
-# Imprimir estadísticas de videos problemáticos
+# Print statistics of problematic videos
 print("bad video conts: ", "ball lost: ", ball_missing, "\npeople overload: ", people_overload, "\nno touches: ", no_touch_counter, "\ntouch happend but data is missing:", len(bad_video_list))
