@@ -1,49 +1,49 @@
-# Script para visualizar arquitectura de red neuronal
-# Crea una imagen visual de la estructura de la red usando visualkeras
+# Script to visualize neural network architecture
+# Creates a visual image of the network structure using visualkeras
 
-# Importación de bibliotecas
+# Import libraries
 import tensorflow as tf
-from tensorflow.keras.models import Sequential  # Modelo secuencial
+from tensorflow.keras.models import Sequential  # Sequential model
 from tensorflow.keras.layers import Dense, Conv1D, LSTM, Flatten, Dropout, Bidirectional
-import visualkeras  # Para visualización de arquitectura de redes
+import visualkeras  # For neural network architecture visualization
 from collections import defaultdict
 
-# Clase personalizada para wrapper de capas Dense (no usada actualmente)
+# Custom class for Dense layer wrapper (currently unused)
 class CustomDense(tf.keras.layers.Dense):
     """
-    Wrapper personalizado para capas Dense.
-    Permite personalizar propiedades de visualización.
+    Custom wrapper for Dense layers.
+    Allows customizing visualization properties.
     """
-    def _init_(self, units, activation=None, **kwargs):
-        super()._init_(units, activation=activation, **kwargs)
+    def __init__(self, units, activation=None, **kwargs):
+        super().__init__(units, activation=activation, **kwargs)
     
     @property
     def output_shape(self):
         input_shape = self.input_shape
         return (input_shape[0], self.units)
 
-# DEFINICIÓN DEL MODELO A VISUALIZAR
-# Modelo con LSTM bidireccional
+# DEFINITION OF THE MODEL TO VISUALIZE
+# Model with Bidirectional LSTM
 model = Sequential()
 
-# Capa 1: Densa con 128 neuronas, entrada de shape (50, 6)
-# 50 = ventana temporal, 6 = características
+# Layer 1: Dense with 128 neurons, input shape (50, 6)
+# 50 = temporal window, 6 = features
 model.add(Dense(128, activation='relu', input_shape=(50, 6)))
 
-# Capa 2: LSTM bidireccional con 64 unidades
-# Procesa la secuencia en ambas direcciones (adelante y atrás)
+# Layer 2: Bidirectional LSTM with 64 units
+# Processes the sequence in both directions (forward and backward)
 model.add(Bidirectional(LSTM(64, activation='relu')))
 
-# Capa 3: Salida con 3 neuronas y activación softmax
+# Layer 3: Output with 3 neurons and softmax activation
 model.add(Dense(3, activation='softmax'))
 
-# CONFIGURACIÓN DE COLORES para visualización
+# COLOR CONFIGURATION for visualization
 color_map = defaultdict(dict)
-# Asignar color turquesa a capas Bidirectional
+# Assign turquoise color to Bidirectional layers
 color_map[Bidirectional] = {'fill': 'turquoise'}
 
-# Visualizar el modelo y mostrarlo en pantalla
+# Visualize the model and show it on screen
 visualkeras.layered_view(model, legend=True, color_map=color_map).show()
 
-# Guardar visualización como imagen PNG
+# Save visualization as PNG image
 visualkeras.layered_view(model, legend=True, color_map=color_map, to_file='C:\\Users\\Domagoj\\Desktop\\Official\\Diplomski\\Bidirectional_network.png')
