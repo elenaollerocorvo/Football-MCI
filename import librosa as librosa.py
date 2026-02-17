@@ -1,34 +1,35 @@
-# Script de prueba para análisis de audio usando Librosa
-# Carga un archivo de audio y visualiza su forma de onda
+# Test script for audio analysis using Librosa
+# Loads an audio file and visualizes its waveform
 
-# Importación de bibliotecas
-import librosa as librosa  # Para procesamiento de audio
-import numpy as np  # Para operaciones numéricas
-import matplotlib.pyplot as plt  # Para visualización
+# Import libraries
+import librosa as librosa  # For audio processing
+import numpy as np  # For numerical operations
+import matplotlib.pyplot as plt  # For visualization
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-import librosa.display  # Para visualizaciones específicas de audio
-from IPython.display import Audio  # Para reproducir audio en notebooks
+import librosa.display  # For audio-specific visualizations
+from IPython.display import Audio  # To play audio in notebooks
 
-# Ruta al archivo de audio WAV
+# Path to the WAV audio file
 path_to_sound = f'C:\\Users\\Domagoj\\Desktop\\Diplomski\\Videos\\Session1\\jetsonCatch02_002604.wav'
 
-# Cargar archivo de audio
-# y: array numpy con las muestras de audio (serie temporal)
-# sr: tasa de muestreo (sampling rate) en Hz
+# Load audio file
+# y: numpy array with audio samples (time series)
+# sr: sampling rate in Hz
 y, sr = librosa.load(path_to_sound, sr=32000)
 
-# Crear array de tiempo correspondiente a cada muestra
-time = np.arange(len(y)) / sr  # Tiempo en segundos
+# Create time array corresponding to each sample
+time = np.arange(len(y)) / sr  # Time in seconds
 
-# Imprimir información sobre el audio cargado
+# Print information about the loaded audio
 print("The sampled audio is returned as a numpy array (time series) and has ", y.shape, " number of samples")
 print("The 10 randomly picked consequitive samples of the audio are: ", y[3000:3010])
 
-# Visualizar forma de onda del audio
+# Visualize audio waveform
 plt.figure(figsize=(10, 4))
-plt.plot(time, y)  # Gráfico de amplitud vs tiempo
+plt.plot(time, y)  # Amplitude vs time plot
 plt.title("Audio Waveform")
 plt.xlabel("Time (s)")
 plt.ylabel("Amplitude")
 plt.show()
+
 
