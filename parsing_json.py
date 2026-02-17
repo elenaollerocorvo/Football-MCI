@@ -1,62 +1,61 @@
-# Script para procesar y limpiar archivos JSON de etiquetas
-# Elimina campos innecesarios y normaliza los datos en un DataFrame
+# Script to process and clean label JSON files
+# Removes unnecessary fields and normalizes data into a DataFrame
 
-# Importación de bibliotecas
-import pandas as pd  # Para manipulación de datos
-import json  # Para leer/escribir JSON
-import os  # Para operaciones de sistema de archivos
+# Import libraries
+import pandas as pd  # For data manipulation
+import json  # For reading/writing JSON
+import os  # For file system operations
 
-# Ruta a la carpeta con archivos JSON de etiquetas
+# Path to the folder with label JSON files
 folder_path = "C:\\Users\\Domagoj\\Desktop\\Session 2 json"
 
-# Lista para almacenar datos de todos los JSON
+# List to store data from all JSONs
 json_data_list = []
 
 def rectify_json():
     """
-    Elimina campos innecesarios de todos los archivos JSON en la carpeta.
-    Los campos eliminados son: project_name, labeler, method, decision_basis
+    Removes unnecessary fields from all JSON files in the folder.
+    The removed fields are: project_name, labeler, method, decision_basis
     """
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
-        # Leer JSON
+        # Read JSON
         f = open(file_path, 'r')
         data = json.load(f)
         
-        # Eliminar campos no necesarios para el procesamiento posterior
+        # Remove unnecessary fields for further processing
+        # Note: Using data.pop('key', None) is safer here to avoid KeyErrors
         del data['project_name']
         del data['labeler']
         del data['method']
         del data['decision_basis']
         f.close()
         
-        # Guardar JSON modificado
+        # Save modified JSON
         f = open(file_path, 'w')
         json.dump(data, f, indent=4)
 
 
-# Cargar todos los archivos JSON en una lista
+# Load all JSON files into a list
 for filename in os.listdir(folder_path):
     if filename.endswith('.json'):
         file_path = os.path.join(folder_path, filename)
         with open(file_path) as f:
             data = json.load(f)
             
-            # Si no hay toques en frames, limpiar también el campo de milisegundos
+            # If there are no touches in frames, also clear the milliseconds field
             if data['button_presses'] == '':
                 data['button_presses_ms'] = ''
                 print(data['button_presses_ms'])
             
             json_data_list.append(data)
 
-# Ejecutar función de limpieza
+# Execute cleaning function
 rectify_json()
 
-# Normalizar lista de JSON a DataFrame de pandas
-cijela_lista  = pd.json_normalize(json_data_list)
+# Normalize JSON list to pandas DataFrame
+cijela_lista = pd.json_normalize(json_data_list)
 
-# Configurar pandas para mostrar todas las filas y columnas
-pd.set_option('display.max_rows', None)  # Mostrar todas las filas
-pd.set_option('display.max_columns', None)  # Mostrar todas las columnas
-
-
+# Configure pandas to show all rows and columns
+pd.set_option('display.max_rows', None)  # Show all rows
+pd.set_option('display.max_columns', None)  # Show all columns
