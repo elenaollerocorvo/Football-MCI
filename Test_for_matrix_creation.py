@@ -1,100 +1,100 @@
-# Script de prueba para validar extracción de características usando YOLO
-# Realiza pruebas de detección de pose y objetos en imágenes/videos
+# Test script to validate feature extraction using YOLO
+# Performs pose and object detection tests on images/videos
 
-# Importación de bibliotecas
-from ultralytics import YOLO  # Framework YOLO para detección
-import cv2  # OpenCV para procesamiento de imágenes
-import torch  # PyTorch (backend de YOLO)
-from math import *  # Funciones matemáticas
+# Import libraries
+from ultralytics import YOLO  # YOLO framework for detection
+import cv2  # OpenCV for image processing
+import torch  # PyTorch (YOLO backend)
+from math import * # Mathematical functions
 
-# Cargar modelos YOLO
-pose = YOLO('yolov8m-pose.pt')  # Modelo de detección de pose humana
-objekt_lopta = YOLO('yolov8x.pt')  # Modelo de detección de objetos
+# Load YOLO models
+pose = YOLO('yolov8m-pose.pt')  # Human pose detection model
+objekt_lopta = YOLO('yolov8x.pt')  # Object detection model
 
-# Rutas a archivos de prueba
+# Paths to test files
 put_do_videa = "C:\\Users\\Domagoj\\Desktop\\Diplomski\\Videos\\Session 0\\jetsonCatch02_002320.avi"  # Video
-put_do_framea = "C:\\Users\\Domagoj\\Desktop\\Yolo_data\\frame43.jpg"  # Imagen individual
+put_do_framea = "C:\\Users\\Domagoj\\Desktop\\Yolo_data\\frame43.jpg"  # Single image
 
-# PRUEBA: Detección de pose en una imagen
+# TEST: Pose detection on an image
 inferece_obj = pose.predict(source=put_do_framea, verbose=False, save=True)
-keypoints = inferece_obj[0].keypoints.xy.cpu().numpy().tolist()  # Extraer keypoints
+keypoints = inferece_obj[0].keypoints.xy.cpu().numpy().tolist()  # Extract keypoints
 
-# Verificar si se detectaron todos los keypoints necesarios
-# 17 keypoints en total, verificar que no haya [0.0, 0.0] en posiciones críticas
+# Check if all necessary keypoints were detected
+# 17 keypoints in total, verify that there are no [0.0, 0.0] in critical positions
 if len(keypoints[0]) == 17 and [0.0,0.0] not in keypoints[0][10:17] and [0.0,0.0] not in keypoints[0][5:7]:
-   print(keypoints, len(keypoints[0]))  # Imprimir keypoints válidos
+   print(keypoints, len(keypoints[0]))  # Print valid keypoints
 
-# Líneas comentadas para otras pruebas
-#inferece_pose = pose.predict(put_do_videa, verbose=False, save= True)  # Detección de pose en video
-#inferece_lopte = objekt_lopta.predict(source=put_do_framea, conf=0.4, classes=[0,32])  # Detección de objetos
-#tracking = objekt_lopta.track(source=put_do_videa, show=True, name='Tracking_test', persist=True, classes=[0,32], conf = 0.4, save=True)  # Tracking en video
+# Commented lines for other tests
+#inferece_pose = pose.predict(put_do_videa, verbose=False, save= True)  # Pose detection in video
+#inferece_lopte = objekt_lopta.predict(source=put_do_framea, conf=0.4, classes=[0,32])  # Object detection
+#tracking = objekt_lopta.track(source=put_do_videa, show=True, name='Tracking_test', persist=True, classes=[0,32], conf = 0.4, save=True)  # Tracking in video
 
-exit()  # Salir del script
+exit()  # Exit the script
 
-# SECCIÓN DE PRUEBAS EXTENDIDAS (requiere descomentar líneas anteriores)
-# Extraer datos de detecciones
-keypoints = inferece_pose[0].keypoints.xy.cpu().numpy().tolist()  # Keypoints de pose
-coord_obj = inferece_lopte[0].boxes.xywh.cpu().tolist()  # Coordenadas de objetos (x, y, w, h)
-bbx_wh = inferece_lopte[0].boxes.xywh.cpu().tolist()  # Dimensiones de bounding boxes
-clss = inferece_lopte[0].boxes.cls.cpu().tolist()  # Clases de objetos detectados
+# EXTENDED TESTS SECTION (requires uncommenting previous lines)
+# Extract data from detections
+keypoints = inferece_pose[0].keypoints.xy.cpu().numpy().tolist()  # Pose keypoints
+coord_obj = inferece_lopte[0].boxes.xywh.cpu().tolist()  # Object coordinates (x, y, w, h)
+bbx_wh = inferece_lopte[0].boxes.xywh.cpu().tolist()  # Bounding boxes dimensions
+clss = inferece_lopte[0].boxes.cls.cpu().tolist()  # Detected object classes
 
-# Clases de referencia en YOLO
-reference_class_ball = 32.0  # Clase 32 = balón deportivo
-reference_class_person = 0.0  # Clase 0 = persona
+# Reference classes in YOLO
+reference_class_ball = 32.0  # Class 32 = sports ball
+reference_class_person = 0.0  # Class 0 = person
 
-indx = 0  # Índice para iterar sobre detecciones
-ball_found = False  # Flag para indicar si se encontró el balón
+indx = 0  # Index to iterate over detections
+ball_found = False  # Flag to indicate if the ball was found
 
-# Extraer keypoints específicos de la pierna derecha
-skup_koordinata_desna_noga = keypoints[0][16]  # Tobillo derecho
-skup_koordinata_desno_koljeno = keypoints[0][14]  # Rodilla derecha
+# Extract specific keypoints of the right leg
+skup_koordinata_desna_noga = keypoints[0][16]  # Right ankle
+skup_koordinata_desno_koljeno = keypoints[0][14]  # Right knee
 
-# Procesar cada objeto detectado
+# Process each detected object
 for klasa in clss:
-    # Si es un balón
+    # If it is a ball
     if klasa == reference_class_ball:
       ball_found = True
-      coord_lopte = coord_obj[indx]  # Coordenadas del balón
-      x_center_ball = coord_lopte[0]  # Centro X del balón
-      y_center_ball = coord_lopte[1]  # Centro Y del balón
-      visina_lopte = bbx_wh[indx]  # Dimensiones del balón
+      coord_lopte = coord_obj[indx]  # Ball coordinates
+      x_center_ball = coord_lopte[0]  # Ball X center
+      y_center_ball = coord_lopte[1]  # Ball Y center
+      visina_lopte = bbx_wh[indx]  # Ball dimensions
       
-    # Si es una persona
+    # If it is a person
     elif klasa == reference_class_person:
-       visina_covj = bbx_wh[indx]  # Altura de la persona
+       visina_covj = bbx_wh[indx]  # Person height
        
-    # Si llegamos al final sin encontrar balón
+    # If we reach the end without finding a ball
     elif not ball_found and len(clss) <= indx+1:
-       print('nema lopte na slici', len(clss), indx)  # No hay balón en la imagen
+       print('nema lopte na slici', len(clss), indx)  # No ball in the image
     
-    indx+=1  # Incrementar índice
+    indx+=1  # Increment index
     
-# VISUALIZACIÓN: Preparar colores y coordenadas para dibujo
-dot_radius = 10  # Radio del punto (no usado actualmente)
-crvena = (0, 0, 255)  # Color rojo en formato BGR
-plava = (255, 0, 0)   # Color azul en formato BGR
-zelena = (0, 255, 0)  # Color verde en formato BGR
+# VISUALIZATION: Prepare colors and coordinates for drawing
+dot_radius = 10  # Dot radius (currently not used)
+crvena = (0, 0, 255)  # Red color in BGR format
+plava = (255, 0, 0)   # Blue color in BGR format
+zelena = (0, 255, 0)  # Green color in BGR format
 
-# Extraer coordenadas X, Y de keypoints
-x_cord_noga = skup_koordinata_desna_noga[0]    # X del tobillo
-y_cord_noga = skup_koordinata_desna_noga[1]    # Y del tobillo
-x_cord_koljeno = skup_koordinata_desno_koljeno[0]  # X de la rodilla
-y_cord_koljeno = skup_koordinata_desno_koljeno[1]  # Y de la rodilla
+# Extract X, Y coordinates of keypoints
+x_cord_noga = skup_koordinata_desna_noga[0]    # Ankle X
+y_cord_noga = skup_koordinata_desna_noga[1]    # Ankle Y
+x_cord_koljeno = skup_koordinata_desno_koljeno[0]  # Knee X
+y_cord_koljeno = skup_koordinata_desno_koljeno[1]  # Knee Y
 
-# Calcular punto medio del muslo (entre rodilla y cadera)
+# Calculate middle point of the thigh (between knee and hip)
 x_cord_tigh = (x_cord_koljeno + keypoints[0][12][0])/2
 y_cord_tigh = (y_cord_koljeno + keypoints[0][12][1])/2
 
-# Calcular punto del pecho (entre hombros)
+# Calculate chest point (between shoulders)
 chest_kp = [(keypoints[0][6][0] + keypoints[0][5][0])/2, (keypoints[0][6][1] + keypoints[0][5][1])/2]
 
-# Calcular distancia euclidiana entre balón y tobillo
+# Calculate Euclidean distance between ball and ankle
 dist_ball_touch = int(sqrt((x_center_ball-x_cord_noga)**2 + (y_center_ball-y_cord_noga)**2))
 
-# Calcular ratio de alturas (persona/balón)
+# Calculate height ratio (person/ball)
 ball_to_person_ratio = visina_covj[3]/visina_lopte[3]
 
-# Obtener resolución del video
+# Get video resolution
 video_capture = cv2.VideoCapture(put_do_videa)
 original_width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
 original_height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -102,25 +102,25 @@ video_capture.release()
 
 print(original_width, original_height)
 
-# VISUALIZACIÓN: Dibujar líneas sobre la imagen para verificar detecciones
+# VISUALIZATION: Draw lines on the image to verify detections
 image = cv2.imread(put_do_framea)
 
-# Línea roja: del balón al pie
+# Red line: from ball to foot
 cv2.line(image, (int(x_center_ball), int(y_center_ball)), (int(x_cord_noga), int(y_cord_noga)), crvena, 2)
 
-# Línea azul: del pecho al pie
+# Blue line: from chest to foot
 cv2.line(image, (int(chest_kp[0]), int(chest_kp[1])), (int(x_cord_noga), int(y_cord_noga)), plava, 2)
 
-# Línea verde: altura de la persona
+# Green line: person height
 cv2.line(image, (int(visina_covj[0]), int(visina_covj[1]- visina_covj[3]/2)), (int(visina_covj[0]), int(visina_covj[1]+ visina_covj[3]/2)), zelena, 2)
 
-# Línea verde: altura del balón
+# Green line: ball height
 cv2.line(image, (int(visina_lopte[0]), int(visina_lopte[1]- visina_lopte[3]/2)), (int(visina_lopte[0]), int(visina_lopte[1]+ visina_lopte[3]/2)), zelena, 2)
 
-# Mostrar imagen con anotaciones
+# Show image with annotations
 cv2.imshow("Image with Dot", image)
-cv2.waitKey(0)  # Esperar tecla para cerrar
-cv2.destroyAllWindows()  # Cerrar ventanas
+cv2.waitKey(0)  # Wait for key to close
+cv2.destroyAllWindows()  # Close windows
 
 #print(bbx_wh)
 
@@ -135,5 +135,3 @@ cv2.destroyAllWindows()  # Cerrar ventanas
 #   success,image = vidcap.read()
 #   print('Read a new frame: ', success)
 #   count += 1
-
-
